@@ -1,59 +1,99 @@
 <script lang="ts">
-import Vue from "vue";
+import {Component, Vue} from "vue-property-decorator";
 import axios, { AxiosResponse } from "axios";
+import { component } from "vue/types/umd";
+import Vuetify from 'vuetify';
 
-// フォームデータ
-class FormData {
-  inputText: string = "";
+class AssetLists {
+  names: string[] = []
+}
+class SimulationStatus {
+  status: string = "stopped"
 }
 
-// ビューモデル
-export default Vue.extend({
-  data() {
-    return {
-      target: new FormData()
-    };
-  },
-  methods: {
-    // 翻訳ボタンクリック時のイベントハンドラ
-    async onSubmit() {
-      if (this.target.inputText) {
-        const translatorResult = await this.invokeTranslator(this.target.inputText);
-      }
-    },
+@Component
+export default class extends Vue {
+  control_cmd: string = "開始";
+  asset_lists: string[] = [];
+  simstatus: SimulationStatus = { status: "stopped" };
 
-    async invokeTranslator(text: string): Promise<void> {
-      const modify = { control_type: 'start' };
-      const res: AxiosResponse = await axios.put("/api/control", modify);
-      return res.data;
+  onControl() {
+    var before_stat = this.simstatus;
+    if (this.control_cmd === "開始") {
+      this.onStart();
+      this.control_cmd = "停止";
+    }
+    else if (this.control_cmd === "停止") {
+      this.onStop();
+      this.control_cmd = "リセット";
+    }
+    else if (this.control_cmd === "リセット") {
+      this.onReset();
+      this.control_cmd = "開始";
     }
   }
-});
+  onUpdate() {
+    this.getAssetLists();
+    this.getSimStatus();
+  }
+  async onStart() {
+    await this.invokeControl('start');
+  }
+  async onStop() {
+      await this.invokeControl('stop');
+  }
+  async onReset() {
+      await this.invokeControl('reset');
+  }
+  async invokeControl(control_type: string): Promise<void> {
+    const req = { control_type: control_type };
+    const res: AxiosResponse = await axios.put("/api/control", req);
+    return res.data;
+  }
+  clearAssets() {
+    this.asset_lists = [];
+  }
+  async getAssetLists() {
+    this.clearAssets();
+    const assets = await this.invokeGetAssetLists();
+    for (var i = 0; i < assets.names.length; i++) {
+      const name = assets.names[i];
+      this.asset_lists.push(name);
+    }
+  }
+  async invokeGetAssetLists(): Promise<AssetLists> {
+    const res: AxiosResponse = await axios.get("/api/assets");
+    return res.data;
+  }
+  getSimStatus() {
+    const res = this.invokeGetSimStatus();
+  }
+  async invokeGetSimStatus(): Promise<void> {
+    await axios.get("/api/status").then(res => {
+      this.simstatus.status = res.data.status;
+    });
+  }
+};
+
 </script>
 
 <template>
   <div class="simulation">
-    <h2>箱庭コマンドの実行</h2>
-    <el-row :gutter="40">
-      <el-col :span="12">
-        <el-form ref="form" :model="target">
-          <el-form-item label="コマンド引数">
-            <el-input
-              type="textarea"
-              rows="8"
-              v-model="target.inputText"
-              placeholder="コマンド引数を入力してください"
-            />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="onSubmit">送信</el-button>
-          </el-form-item>
-        </el-form>
+    <h2 :v-model="simstatus">箱庭シミュレーション({{simstatus.status}})</h2>
+
+    <el-row type="flex">
+      <el-col>
+        <el-button class="sim_button" type="primary" @click="onControl">{{control_cmd}}</el-button>
       </el-col>
-      <el-col :span="12">
-        <span>コマンド実行結果</span>
+      <el-col>
+        <el-button class="sim_button" type="primary" @click="onUpdate">更新</el-button>
+      </el-col>
+      <el-col>
+        <span>アセット一覧</span>
         <ul>
-          <li> </li>
+          <li v-for="asset_name in asset_lists" :key="asset_name">
+            {{ asset_name }}
+          </li>
         </ul>
       </el-col>
     </el-row>
@@ -63,5 +103,15 @@ export default Vue.extend({
 <style scoped>
 .translator {
   text-align: left;
+}
+.sim_button {
+    width: 50%;
+    min-width: 100px;
+    max-width: 200px;
+    padding: 10px;
+    box-sizing: border-box;
+    border: 1px solid #68779a;
+    background: #cbe8fa;
+    cursor: pointer;
 }
 </style>
