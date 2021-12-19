@@ -1,0 +1,29 @@
+{
+  "name": "vue-lab",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "mock": "prism mock mock-data.yaml",
+    "build": "vue-cli-service build --dest ../../hakoniwa-web-server-java/project/src/main/resources/static"
+  },
+  "dependencies": {
+    "element-ui": "^2.4.5",
+    "tinymce": "^5.10.2",
+    "@tinymce/tinymce-vue": "^3.2.8",
+    "@vue/composition-api": "^1.4.0",
+    "vue": "^2.6.11",
+    "vue-router": "^3.2.0"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-router": "~4.5.0",
+    "@vue/cli-plugin-typescript": "~4.5.0",
+    "@vue/cli-service": "~4.5.0",
+    "axios": "^0.24.0",
+    "prism": "^4.1.2",
+    "typescript": "~4.1.5",
+    "vue-cli-plugin-axios": "0.0.4",
+    "vue-cli-plugin-element": "~1.0.1",
+    "vue-template-compiler": "^2.6.11"
+  }
+}
