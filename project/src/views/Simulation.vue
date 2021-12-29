@@ -3,6 +3,8 @@ import {Component, Vue} from "vue-property-decorator";
 import axios, { AxiosResponse } from "axios";
 import { component } from "vue/types/umd";
 import Vuetify from 'vuetify';
+import * as mqtt from 'mqtt'
+import { MqttClient } from "mqtt";
 
 class AssetLists {
   names: string[] = []
@@ -16,6 +18,16 @@ export default class extends Vue {
   control_cmd: string = "開始";
   asset_lists: string[] = [];
   simstatus: SimulationStatus = { status: "stopped" };
+  mqtt_broker_ipaddr: string = '192.168.11.36';
+  mqtt_broker_portno: string = '9090';
+  topic: string = "mqtt_test"
+  mqtt_client: MqttClient = mqtt.connect('ws://' + this.mqtt_broker_ipaddr + ':' + this.mqtt_broker_portno + '/mqtt');
+  blob: Blob | null = null;
+  imgBlobUrl: string | null = null;
+
+  mqtt_on_connect() {
+    console.log('mqtt connect!!')
+  }
 
   onControl() {
     var before_stat = this.simstatus;
@@ -35,6 +47,12 @@ export default class extends Vue {
   onUpdate() {
     this.getAssetLists();
     this.getSimStatus();
+    this.mqtt_client.subscribe(this.topic);
+
+    this.mqtt_client.on('message',  (topic, message) => {
+      this.blob = new Blob([message])
+      this.imgBlobUrl = window.URL.createObjectURL(this.blob)
+    });
   }
   async onStart() {
     await this.invokeControl('start');
@@ -96,6 +114,9 @@ export default class extends Vue {
           </li>
         </ul>
       </el-col>
+    </el-row>
+    <el-row>
+      <img v-bind:src="imgBlobUrl" v-if="imgBlobUrl" />
     </el-row>
   </div>
 </template>
