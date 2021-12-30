@@ -1,58 +1,75 @@
 <script lang="ts">
-import {Component, Vue} from "vue-property-decorator";
+import {Component, Vue, Prop } from "vue-property-decorator";
 import axios, { AxiosResponse } from "axios";
-import { component } from "vue/types/umd";
-import Vuetify from 'vuetify';
 import * as mqtt from 'mqtt'
 import { MqttClient } from "mqtt";
+import { 
+  SimulationStatus,
+  convertStateToViewStatus,
+  convertStateToViewAction
+} from '../scripts/simulation';
 
 class AssetLists {
   names: string[] = []
 }
-class SimulationStatus {
-  status: string = "stopped"
-}
-
 @Component
 export default class extends Vue {
-  control_cmd: string = "開始";
+  simStatusView: string = "停止";
+  simButtonView: string = "開始";
+  simstatus: SimulationStatus = { state: "stopped", simtime: "0.000" };
   asset_lists: string[] = [];
-  simstatus: SimulationStatus = { status: "stopped" };
   mqtt_broker_ipaddr: string = '192.168.11.36';
   mqtt_broker_portno: string = '9090';
   topic: string = "mqtt_test"
-  mqtt_client: MqttClient = mqtt.connect('ws://' + this.mqtt_broker_ipaddr + ':' + this.mqtt_broker_portno + '/mqtt');
+  mqtt_client?: MqttClient = undefined;
   blob: Blob | null = null;
   imgBlobUrl: string | null = null;
+  intervalTimeMsec: number = 1000;
+  intervalTimeId?: NodeJS.Timer = undefined;
 
-  mqtt_on_connect() {
-    console.log('mqtt connect!!')
-  }
-
+  
   onControl() {
-    var before_stat = this.simstatus;
-    if (this.control_cmd === "開始") {
+    if (this.simstatus.state === "stopped") {
       this.onStart();
-      this.control_cmd = "停止";
+      this.onUpdate();
     }
-    else if (this.control_cmd === "停止") {
+    else if (this.simstatus.state === "running") {
       this.onStop();
-      this.control_cmd = "リセット";
-    }
-    else if (this.control_cmd === "リセット") {
       this.onReset();
-      this.control_cmd = "開始";
+    } else {
+      this.onReset();
     }
   }
   onUpdate() {
-    this.getAssetLists();
+    //this.getAssetLists();
+    if (this.mqtt_client === undefined) {
+      this.mqtt_client = mqtt.connect('ws://' + this.mqtt_broker_ipaddr + ':' + this.mqtt_broker_portno + '/mqtt');
+      this.mqtt_client.subscribe(this.topic);
+      this.mqtt_client.on('message',  (topic, message) => {
+          this.blob = new Blob([message])
+          this.imgBlobUrl = window.URL.createObjectURL(this.blob)
+      });
+    }
+    if (this.intervalTimeId === undefined) {
+      this.intervalTimeId = setInterval(() => { this.timer() }, this.intervalTimeMsec);
+    }
+  }
+  mounted() {
+    alert("シミュレーション画面入りました");
+    this.onUpdate();
+  }
+  destroyed () {
+    alert("シミュレーション画面から抜けます");
+    if (this.intervalTimeId) {
+      clearInterval(this.intervalTimeId);
+    }
+    if (this.mqtt_client) {
+      this.mqtt_client.end(true);
+      this.mqtt_client = undefined;
+    }
+  }
+  timer() {
     this.getSimStatus();
-    this.mqtt_client.subscribe(this.topic);
-
-    this.mqtt_client.on('message',  (topic, message) => {
-      this.blob = new Blob([message])
-      this.imgBlobUrl = window.URL.createObjectURL(this.blob)
-    });
   }
   async onStart() {
     await this.invokeControl('start');
@@ -88,51 +105,55 @@ export default class extends Vue {
   }
   async invokeGetSimStatus(): Promise<void> {
     await axios.get("/api/status").then(res => {
-      this.simstatus.status = res.data.status;
+      this.simstatus.state = res.data.status;
+      this.simStatusView = convertStateToViewStatus(this.simstatus.state);
+      this.simButtonView = convertStateToViewAction(this.simstatus.state);
     });
   }
 };
+
 
 </script>
 
 <template>
   <div class="simulation">
-    <h2 :v-model="simstatus">箱庭シミュレーション({{simstatus.status}})</h2>
-
-    <el-row type="flex">
-      <el-col>
-        <el-button class="sim_button" type="primary" @click="onControl">{{control_cmd}}</el-button>
-      </el-col>
-      <el-col>
-        <el-button class="sim_button" type="primary" @click="onUpdate">更新</el-button>
-      </el-col>
-      <el-col>
-        <span>アセット一覧</span>
-        <ul>
-          <li v-for="asset_name in asset_lists" :key="asset_name">
-            {{ asset_name }}
-          </li>
-        </ul>
+    <h2 :v-model="simStatusView">箱庭シミュレーション({{simStatusView}})</h2>
+    <el-row :gutter="20" >
+      <el-col :span="16">
+        <el-button :v-model="simButtonView" class="sim_button" type="primary" @click="onControl">{{simButtonView}}</el-button>
       </el-col>
     </el-row>
-    <el-row>
+    <el-row :gutter="20">
       <img v-bind:src="imgBlobUrl" v-if="imgBlobUrl" />
     </el-row>
   </div>
 </template>
 
 <style scoped>
-.translator {
-  text-align: left;
-}
-.sim_button {
-    width: 50%;
-    min-width: 100px;
-    max-width: 200px;
-    padding: 10px;
-    box-sizing: border-box;
-    border: 1px solid #68779a;
-    background: #cbe8fa;
-    cursor: pointer;
-}
+  .simulation {
+    text-align: left;
+  }
+  .el-row {
+    margin-bottom: 20px;
+  }
+  .el-col {
+    border-radius: 4px;
+  }
+  .bg-purple-dark {
+    background: #99a9bf;
+  }
+  .bg-purple {
+    background: #d3dce6;
+  }
+  .bg-purple-light {
+    background: #e5e9f2;
+  }
+  .grid-content {
+    border-radius: 4px;
+    min-height: 36px;
+  }
+  .row-bg {
+    padding: 10px 0;
+    background-color: #f9fafc;
+  }
 </style>
