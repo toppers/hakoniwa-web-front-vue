@@ -1,8 +1,8 @@
 <template>
   <div id="app">
     <el-container>
-      <el-aside>
-        <el-menu id="nav">
+      <el-header >
+        <el-menu  mode="horizontal" id="nav">
           <el-menu-item>
             <router-link to="/">Home</router-link>
           </el-menu-item>
@@ -13,7 +13,7 @@
             <router-link to="/about">About</router-link>
           </el-menu-item>
         </el-menu>
-      </el-aside>
+      </el-header>
       <el-main>
         <router-view />
       </el-main>
