@@ -20,22 +20,26 @@ export default class extends Vue {
   asset_lists: string[] = [];
   mqtt_broker_ipaddr: string = '192.168.11.36';
   mqtt_broker_portno: string = '9090';
-  topic: string = "mqtt_test"
+  topic_camera_1: string = "mqtt_camera_1";
+  topic_camera_2: string = "mqtt_camera_2";
+  topic_hako: string = "mqtt_hako_env";
   mqtt_client?: MqttClient = undefined;
-  blob: Blob | null = null;
-  imgBlobUrl: string | null = null;
+  blob_camera1: Blob | null = null;
+  imgBlobUrl_camera1: string | null = null;
+  blob_camera2: Blob | null = null;
+  imgBlobUrl_camera2: string | null = null;
   intervalTimeMsec: number = 1000;
   intervalTimeId?: NodeJS.Timer = undefined;
 
   
   onControl() {
     if (this.simstatus.state === "stopped") {
+      this.onReset();
       this.onStart();
       this.onUpdate();
     }
     else if (this.simstatus.state === "running") {
       this.onStop();
-      this.onReset();
     } else {
       this.onReset();
     }
@@ -44,10 +48,21 @@ export default class extends Vue {
     //this.getAssetLists();
     if (this.mqtt_client === undefined) {
       this.mqtt_client = mqtt.connect('ws://' + this.mqtt_broker_ipaddr + ':' + this.mqtt_broker_portno + '/mqtt');
-      this.mqtt_client.subscribe(this.topic);
+      this.mqtt_client.subscribe(this.topic_camera_1);
+      this.mqtt_client.subscribe(this.topic_camera_2);
+      this.mqtt_client.subscribe(this.topic_hako);
       this.mqtt_client.on('message',  (topic, message) => {
-          this.blob = new Blob([message])
-          this.imgBlobUrl = window.URL.createObjectURL(this.blob)
+        if (topic === this.topic_camera_1) {
+          this.blob_camera1 = new Blob([message])
+          this.imgBlobUrl_camera1 = window.URL.createObjectURL(this.blob_camera1)
+        }
+        else if (topic === this.topic_camera_2) {
+          this.blob_camera2 = new Blob([message])
+          this.imgBlobUrl_camera2 = window.URL.createObjectURL(this.blob_camera2)
+        }
+        else if (topic === this.topic_hako) {
+          this.simstatus.simtime = message.toString();
+        }
       });
     }
     if (this.intervalTimeId === undefined) {
@@ -117,14 +132,30 @@ export default class extends Vue {
 
 <template>
   <div class="simulation">
-    <h2 :v-model="simStatusView">箱庭シミュレーション({{simStatusView}})</h2>
     <el-row :gutter="20" >
-      <el-col :span="16">
-        <el-button :v-model="simButtonView" class="sim_button" type="primary" @click="onControl">{{simButtonView}}</el-button>
+      <el-col :span="24">
+        <h2 :v-model="simStatusView">箱庭シミュレーション({{simStatusView}})</h2>
       </el-col>
     </el-row>
-    <el-row :gutter="20">
-      <img v-bind:src="imgBlobUrl" v-if="imgBlobUrl" />
+    <el-row :gutter="20" >
+      <el-col :span="4">
+        <el-button :v-model="simButtonView" class="sim_button" type="primary" @click="onControl">{{simButtonView}}</el-button>
+      </el-col>
+      <el-col :span="20">
+        <h3 :v-model="simstatus">シミュレーション時間：{{simstatus.simtime}}</h3>
+      </el-col>
+    </el-row>
+    <el-row :gutter="20" >
+      <el-col :span="12">
+        <img v-bind:src="imgBlobUrl_camera1" v-if="imgBlobUrl_camera1" class="image_size_mid"/>
+      </el-col>
+      <el-col :span="12">
+        <img v-bind:src="imgBlobUrl_camera2" v-if="imgBlobUrl_camera2" class="image_size_mid"/>
+      </el-col>
+    </el-row>
+    <el-row :gutter="20" >
+      <el-col :span="24">
+      </el-col>
     </el-row>
   </div>
 </template>
@@ -155,5 +186,17 @@ export default class extends Vue {
   .row-bg {
     padding: 10px 0;
     background-color: #f9fafc;
+  }
+  .image_size_max{
+    width: 640px;
+    height: 480px;	
+  }
+  .image_size_mid{
+    width: 320px;
+    height: 240px;	
+  }
+  .image_size_min{
+    width: 160px;
+    height: 120px;	
   }
 </style>
